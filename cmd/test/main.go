@@ -1,5 +1,7 @@
 package main
 
+// TODO: Delete this and add unit tests. This is just for manual testing purposes.
+
 import (
 	"bytes"
 	"fmt"
@@ -63,18 +65,11 @@ func main() {
 		return
 	}
 
-	//shellScripts := proj.shellScriptBuildPhases()
-	//fmt.Printf(">>> %+v\n", proj.Comments)
-
 	_, err = plist.MarshalIndent(proj, plist.OpenStepFormat, "  ")
-	//writeBuf := &bytes.Buffer{}
-	//encoder := plist.NewEncoder(writeBuf)
-	//err = encoder.Encode(shellScripts)
 	if err != nil {
 		log.Fatal(err)
 		return
 	}
-	//fmt.Printf("RUNNING TEST %v\n", string(updated))
 
 	fmt.Println("NODES:")
 	showNodes(meta.Nodes, 1)

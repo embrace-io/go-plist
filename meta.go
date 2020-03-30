@@ -19,6 +19,13 @@ type MetaNode struct {
 	nodes []Node
 }
 
+func NewMetaNode() *MetaNode {
+	return &MetaNode{
+		annotations: []*Annotation{},
+		nodes:       []Node{},
+	}
+}
+
 func (n *MetaNode) Nodes() []Node {
 	return n.nodes
 }

@@ -199,7 +199,6 @@ func (p *textPlistParser) skipWhitespaceAndComments() []string {
 		} else if strings.HasPrefix(p.input[p.pos:], "/*") {
 			if x := strings.Index(p.input[p.pos:], "*/"); x >= 0 {
 				str := p.input[p.pos:p.pos + x + 2]
-				//fmt.Printf("comment str >> %v, %v, %v", p.pos, x, str)
 				comments = append(comments, str)
 				p.pos += x + 2 // skip the */ as well
 				continue       // consume more whitespace
@@ -290,18 +289,6 @@ func (p *textPlistParser) parseEscape() string {
 	return s
 }
 
-// the / has already been consumed
-func (p *textPlistParser) parseComment() {
-
-	// Open inline
-	if p.peek() == '*' {
-		p.scanUntilAny("*/")
-		commentStr := p.emit()
-		fmt.Println(commentStr)
-	}
-
-}
-
 // the " has already been consumed
 func (p *textPlistParser) parseQuotedString() cfString {
 	p.ignore() // ignore the "
@@ -352,10 +339,9 @@ func (p *textPlistParser) parseDictionary(ignoreEof bool, node Node) cfValue {
 outer:
 	for {
 		// Section comments
-		comments := p.skipWhitespaceAndComments()
-		if comments != nil && node != nil {
+		if comments := p.skipWhitespaceAndComments(); comments != nil && node != nil {
 			for _, comment := range comments {
-				// Need to better distinguish adding annotations to node, vs adding node level annotation node
+				// Section comments are node level.
 				node.AddNode(NewAnnotation(comment))
 			}
 		}
@@ -378,11 +364,9 @@ outer:
 		// INVARIANT: key can't be nil; parseQuoted and parseUnquoted
 		// will panic out before they return nil.
 
-		child := &MetaNode{value:string(keypv.(cfString))}
-
-		// Outer object
-		comments = p.skipWhitespaceAndComments()
-		if comments != nil && node != nil {
+		child := NewMetaNode()
+		child.SetValue(string(keypv.(cfString)))
+		if comments := p.skipWhitespaceAndComments(); comments != nil && node != nil {
 			for _, comment := range comments {
 				child.AddAnnotation(NewAnnotation(comment))
 			}
@@ -401,8 +385,7 @@ outer:
 			}
 
 			// Child object
-			comments = p.skipWhitespaceAndComments()
-			if comments != nil {
+			if comments := p.skipWhitespaceAndComments(); comments != nil {
 				if valueNode != nil {
 					for _, comment := range comments {
 						valueNode.AddAnnotation(NewAnnotation(comment))
@@ -460,7 +443,7 @@ outer:
 			p.backup()
 		}
 
-		child := &MetaNode{}
+		child := NewMetaNode()
 		pval := p.parsePlistValue(child) // whitespace is consumed within
 		if str, ok := pval.(cfString); ok && string(str) == "" {
 			// Empty strings in arrays are apparently skipped?
@@ -569,18 +552,16 @@ func (p *textPlistParser) parseHexData() cfData {
 
 func (p *textPlistParser) parsePlistValue(node Node) cfValue {
 	for {
-		comments := p.skipWhitespaceAndComments()
-		if comments != nil && node != nil {
+		if comments := p.skipWhitespaceAndComments(); comments != nil && node != nil {
 			for _, comment := range comments {
-				// Need to better distinguish between when we're adding annotation nodes vs. when adding annotations
-				node.AddNode(&Annotation{value:comment})
+				// Node level annotations.
+				node.AddNode(NewAnnotation(comment))
 			}
 		}
 
-		var val cfValue
 		switch p.next() {
 		case eof:
-			val = &cfDictionary{}
+			return &cfDictionary{}
 		case '<':
 			if p.next() == '*' {
 				p.format = GNUStepFormat
@@ -590,17 +571,15 @@ func (p *textPlistParser) parsePlistValue(node Node) cfValue {
 			p.backup()
 			return p.parseHexData()
 		case '"':
-			val = p.parseQuotedString()
+			return p.parseQuotedString()
 		case '{':
-			val = p.parseDictionary(false, node)
+			return p.parseDictionary(false, node)
 		case '(':
-			val = p.parseArray(node)
+			return p.parseArray(node)
 		default:
 			p.backup()
-			val = p.parseUnquotedString()
+			return p.parseUnquotedString()
 		}
-
-		return val
 	}
 }
 

@@ -19,16 +19,7 @@ type cfValue interface {
 type cfDictionary struct {
 	keys   sort.StringSlice
 	values []cfValue
-
-	keyComments []string
-	valueComments []string
 }
-
-//func (p *cfDictionary) Annotations() []Annotation{
-//	return nil
-//}
-//
-//func (p *cfDictionary) Value
 
 func (*cfDictionary) typeName() string {
 	return "dictionary"
