@@ -88,7 +88,10 @@ func (p *textPlistParser) parseDocument() (pval cfValue, parseError error) {
 	val := p.parsePlistValue(node)
 	p.meta.addNode(node)
 
-	p.skipWhitespaceAndComments()
+	comments := p.skipWhitespaceAndComments()
+	if comments != nil {
+		fmt.Println(comments)
+	}
 	if p.peek() != eof {
 		if _, ok := val.(cfString); !ok {
 			p.error("garbage after end of document")
@@ -186,6 +189,7 @@ func (p *textPlistParser) skipWhitespaceAndComments() []string {
 		p.scanCharactersInSet(&whitespace)
 		if strings.HasPrefix(p.input[p.pos:], "//") {
 			p.scanCharactersNotInSet(&newlineCharacterSet)
+			comments = append(comments, p.emit())
 		} else if strings.HasPrefix(p.input[p.pos:], "/*") {
 			if x := strings.Index(p.input[p.pos:], "*/"); x >= 0 {
 				str := p.input[p.pos:p.pos + x + 2]
@@ -339,9 +343,6 @@ func (p *textPlistParser) parseDictionary(ignoreEof bool, node Node) cfValue {
 	keys := make([]string, 0, 32)
 	values := make([]cfValue, 0, 32)
 
-	keyComments := make([]string, 0, 32)
-	valueComments := make([]string, 0, 32)
-
 outer:
 	for {
 		// Section comments
@@ -378,34 +379,17 @@ outer:
 			for _, comment := range comments {
 				child.addAnnotation(comment)
 			}
-			keyComments = append(keyComments, comments...)
-			//if node != nil {
-			//	for _, comment := range comments {
-			//		node.addAnnotation(comment)
-			//	}
-			//}
-		} else {
-			keyComments = append(keyComments, "")
 		}
 
 
-		//finalNode := &MetaNode{}
 
 		var val cfValue
 		n := p.next()
 		if n == ';' {
 			val = keypv
-			//finalNode.SetValue(string(val.(cfString)))
-			//addFinalNode = true
-
-			//node.AddNode()
 		} else if n == '=' {
 			// whitespace is consumed within
-			//child := &MetaNode{}
 			val = p.parsePlistValue(child)
-			//if node != nil {
-			//	node.AddNode(child)
-			//}
 			var valueNode *MetaNode
 			if strVal, ok := val.(cfString); ok {
 				valueNode = &MetaNode{value: string(strVal)}
@@ -414,15 +398,11 @@ outer:
 			// Child object
 			comments = p.skipWhitespaceAndComments()
 			if comments != nil {
-				valueComments = append(valueComments, comments...)
 				if valueNode != nil {
 					for _, comment := range comments {
 						valueNode.AddAnnotation(comment)
-						//finalNode.AddAnnotation(comment)
 					}
 				}
-			} else {
-				valueComments = append(valueComments, "")
 			}
 
 			if child != nil && valueNode != nil {
@@ -436,14 +416,6 @@ outer:
 			p.error("missing = in dictionary")
 		}
 
-		//if addFinalNode {
-		//	node.AddNode(finalNode)
-		//}
-
-		//if node != nil {
-		//	node.SetValue(string(keypv.(cfString)))
-		//}
-
 		if node != nil {
 			node.AddNode(child)
 		}
@@ -452,7 +424,7 @@ outer:
 		values = append(values, val)
 	}
 
-	dict := &cfDictionary{keys: keys, values: values, keyComments: keyComments, valueComments: valueComments}
+	dict := &cfDictionary{keys: keys, values: values}
 	return dict.maybeUID(p.format == OpenStepFormat)
 }
 
@@ -590,7 +562,13 @@ func (p *textPlistParser) parseHexData() cfData {
 func (p *textPlistParser) parsePlistValue(node Node) cfValue {
 	for {
 		// Grab these comments
-		p.skipWhitespaceAndComments()
+		//p.skipWhitespaceAndComments()
+		comments := p.skipWhitespaceAndComments()
+		if comments != nil {
+			for _, comment := range comments {
+				node.AddNode(&Annotation{value:comment})
+			}
+		}
 
 		var val cfValue
 		switch p.next() {
