@@ -24,6 +24,12 @@ type cfDictionary struct {
 	valueComments []string
 }
 
+//func (p *cfDictionary) Annotations() []Annotation{
+//	return nil
+//}
+//
+//func (p *cfDictionary) Value
+
 func (*cfDictionary) typeName() string {
 	return "dictionary"
 }

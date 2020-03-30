@@ -21,6 +21,8 @@ type textPlistParser struct {
 	start int
 	pos   int
 	width int
+
+	meta *Meta
 }
 
 func convertU16(buffer []byte, bo binary.ByteOrder) (string, error) {
@@ -82,7 +84,9 @@ func (p *textPlistParser) parseDocument() (pval cfValue, parseError error) {
 		panic(err)
 	}
 
-	val := p.parsePlistValue()
+	node := &MetaNode{value: "root"}
+	val := p.parsePlistValue(node)
+	p.meta.addNode(node)
 
 	p.skipWhitespaceAndComments()
 	if p.peek() != eof {
@@ -92,7 +96,7 @@ func (p *textPlistParser) parseDocument() (pval cfValue, parseError error) {
 
 		p.start = 0
 		p.pos = 0
-		val = p.parseDictionary(true)
+		val = p.parseDictionary(true, nil)
 	}
 
 	pval = val
@@ -329,7 +333,7 @@ func (p *textPlistParser) parseUnquotedString() cfString {
 }
 
 // the { has already been consumed
-func (p *textPlistParser) parseDictionary(ignoreEof bool) cfValue {
+func (p *textPlistParser) parseDictionary(ignoreEof bool, node Node) cfValue {
 	//p.ignore() // ignore the {
 	var keypv cfValue
 	keys := make([]string, 0, 32)
@@ -342,8 +346,10 @@ outer:
 	for {
 		// Section comments
 		comments := p.skipWhitespaceAndComments()
-		if comments != nil {
-			fmt.Println(comments)
+		if comments != nil && node != nil {
+			for _, comment := range comments {
+				node.AddNode(&Annotation{value:comment})
+			}
 		}
 
 		switch p.next() {
@@ -356,8 +362,6 @@ outer:
 			break outer
 		case '"':
 			keypv = p.parseQuotedString()
-		//case '/':
-		//	p.parseComment()
 		default:
 			p.backup()
 			keypv = p.parseUnquotedString()
@@ -370,17 +374,29 @@ outer:
 		comments = p.skipWhitespaceAndComments()
 		if comments != nil {
 			keyComments = append(keyComments, comments...)
+			//if node != nil {
+			//	for _, comment := range comments {
+			//		node.addAnnotation(comment)
+			//	}
+			//}
 		} else {
 			keyComments = append(keyComments, "")
 		}
+
+		child := &MetaNode{value:string(keypv.(cfString))}
 
 		var val cfValue
 		n := p.next()
 		if n == ';' {
 			val = keypv
+			node.AddNode(&MetaNode{value:string(val.(cfString))})
 		} else if n == '=' {
 			// whitespace is consumed within
-			val = p.parsePlistValue()
+			//child := &MetaNode{}
+			val = p.parsePlistValue(child)
+			//if node != nil {
+			//	node.AddNode(child)
+			//}
 
 			// Child object
 			comments = p.skipWhitespaceAndComments()
@@ -395,6 +411,14 @@ outer:
 			}
 		} else {
 			p.error("missing = in dictionary")
+		}
+
+		//if node != nil {
+		//	node.SetValue(string(keypv.(cfString)))
+		//}
+
+		if node != nil {
+			node.AddNode(child)
 		}
 
 		keys = append(keys, string(keypv.(cfString)))
@@ -424,7 +448,7 @@ outer:
 			p.backup()
 		}
 
-		pval := p.parsePlistValue() // whitespace is consumed within
+		pval := p.parsePlistValue(nil) // whitespace is consumed within
 		if str, ok := pval.(cfString); ok && string(str) == "" {
 			// Empty strings in arrays are apparently skipped?
 			// TODO: Figure out why this was implemented.
@@ -519,13 +543,15 @@ func (p *textPlistParser) parseHexData() cfData {
 	}
 }
 
-func (p *textPlistParser) parsePlistValue() cfValue {
+func (p *textPlistParser) parsePlistValue(node Node) cfValue {
 	for {
+		// Grab these comments
 		p.skipWhitespaceAndComments()
 
+		var val cfValue
 		switch p.next() {
 		case eof:
-			return &cfDictionary{}
+			val = &cfDictionary{}
 		case '<':
 			if p.next() == '*' {
 				p.format = GNUStepFormat
@@ -535,15 +561,28 @@ func (p *textPlistParser) parsePlistValue() cfValue {
 			p.backup()
 			return p.parseHexData()
 		case '"':
-			return p.parseQuotedString()
+			val = p.parseQuotedString()
+			if node != nil {
+				node.AddNode(&MetaNode{value:string(val.(cfString))})
+			}
 		case '{':
-			return p.parseDictionary(false)
+			//child := &MetaNode{}
+			val = p.parseDictionary(false, node)
+			//if node != nil {
+			//	node.AddNode(child)
+			//}
+
 		case '(':
-			return p.parseArray()
+			val = p.parseArray()
 		default:
 			p.backup()
-			return p.parseUnquotedString()
+			val =  p.parseUnquotedString()
+			if node != nil {
+				node.AddNode(&MetaNode{value:string(val.(cfString))})
+			}
 		}
+
+		return val
 	}
 }
 
