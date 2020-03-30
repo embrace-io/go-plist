@@ -60,12 +60,6 @@ func (n *MetaNode) AddNode(node Node) {
 	if n.nodes == nil {
 		n.nodes = []Node{}
 	}
-	//if n.childAnnotations == nil {
-	//	n.childAnnotations = make(map[string]Annotation)
-	//}
-	//if annotation, ok := n.childAnnotations[node.Value()]; ok {
-	//	node.AddAnnotation(annotation.Value())
-	//}
 	n.nodes = append(n.nodes, node)
 }
 
