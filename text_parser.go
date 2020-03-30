@@ -460,9 +460,17 @@ outer:
 func (p *textPlistParser) parseArray(node Node) *cfArray {
 	//p.ignore() // ignore the (
 	values := make([]cfValue, 0, 32)
+	children := make([]Node, 0, 32)
 outer:
 	for {
-		p.skipWhitespaceAndComments()
+
+		comments := p.skipWhitespaceAndComments()
+		if comments != nil {
+			child := children[len(children) - 1]
+			for _, comment := range comments {
+				child.AddAnnotation(comment)
+			}
+		}
 
 		switch p.next() {
 		case eof:
@@ -475,19 +483,23 @@ outer:
 			p.backup()
 		}
 
-		//child := &MetaNode{}
-		pval := p.parsePlistValue(nil) // whitespace is consumed within
+		child := &MetaNode{}
+		pval := p.parsePlistValue(child) // whitespace is consumed within
 		if str, ok := pval.(cfString); ok && string(str) == "" {
 			// Empty strings in arrays are apparently skipped?
 			// TODO: Figure out why this was implemented.
 			continue
 		}
-		//if str, ok := pval.(cfString); ok {
-		//	child.SetValue(string(str))
-		//}
-		//node.AddNode(child)
+		if str, ok := pval.(cfString); ok {
+			child.SetValue(string(str))
+			children = append(children, child)
+		}
 		values = append(values, pval)
 	}
+	for _, child := range children {
+		node.AddNode(child)
+	}
+
 	return &cfArray{values}
 }
 
