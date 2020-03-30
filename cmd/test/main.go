@@ -57,6 +57,7 @@ func main() {
 	decoder := plist.NewDecoder(buf)
 	meta := plist.NewMeta()
 	err = decoder.DecodeWithMeta(&proj, meta)
+	//err = decoder.Decode(&proj)
 	if err != nil {
 		log.Fatal(err)
 		return

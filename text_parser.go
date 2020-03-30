@@ -84,14 +84,20 @@ func (p *textPlistParser) parseDocument() (pval cfValue, parseError error) {
 		panic(err)
 	}
 
-	node := &MetaNode{value: "root"}
-	val := p.parsePlistValue(node)
-	p.meta.addNode(node)
-
-	comments := p.skipWhitespaceAndComments()
-	if comments != nil {
-		fmt.Println(comments)
+	var node Node
+	if p.meta != nil {
+		node = &MetaNode{value: "root"}
 	}
+
+	val := p.parsePlistValue(node)
+
+	if p.meta != nil {
+		p.meta.addNode(node)
+	}
+
+	// TODO: Grab comments at end of document?
+	p.skipWhitespaceAndComments()
+
 	if p.peek() != eof {
 		if _, ok := val.(cfString); !ok {
 			p.error("garbage after end of document")
@@ -349,6 +355,7 @@ outer:
 		comments := p.skipWhitespaceAndComments()
 		if comments != nil && node != nil {
 			for _, comment := range comments {
+				// Need to better distinguish adding annotations to node, vs adding node level annotation node
 				node.AddNode(&Annotation{value:comment})
 			}
 		}
@@ -380,8 +387,6 @@ outer:
 				child.addAnnotation(comment)
 			}
 		}
-
-
 
 		var val cfValue
 		n := p.next()
@@ -561,11 +566,10 @@ func (p *textPlistParser) parseHexData() cfData {
 
 func (p *textPlistParser) parsePlistValue(node Node) cfValue {
 	for {
-		// Grab these comments
-		//p.skipWhitespaceAndComments()
 		comments := p.skipWhitespaceAndComments()
-		if comments != nil {
+		if comments != nil && node != nil {
 			for _, comment := range comments {
+				// Need to better distinguish between when we're adding annotation nodes vs. when adding annotations
 				node.AddNode(&Annotation{value:comment})
 			}
 		}
@@ -584,24 +588,13 @@ func (p *textPlistParser) parsePlistValue(node Node) cfValue {
 			return p.parseHexData()
 		case '"':
 			val = p.parseQuotedString()
-			//if node != nil {
-			//	node.AddNode(&MetaNode{value:string(val.(cfString))})
-			//}
 		case '{':
-			//child := &MetaNode{}
 			val = p.parseDictionary(false, node)
-			//if node != nil {
-			//	node.AddNode(child)
-			//}
-
 		case '(':
 			val = p.parseArray(node)
 		default:
 			p.backup()
 			val = p.parseUnquotedString()
-			//if node != nil {
-			//	node.AddNode(&MetaNode{value:string(val.(cfString))})
-			//}
 		}
 
 		return val
