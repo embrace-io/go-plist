@@ -11,12 +11,7 @@ type Node interface {
 	Nodes() []Node
 	AddNode(node Node)
 	SetValue(val string)
-	//AddChildAnnotation(key, val string)
 }
-
-//type Node struct {
-//	Annotations []Annotation
-//}
 
 type MetaNode struct {
 	value string
