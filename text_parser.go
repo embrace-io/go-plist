@@ -473,8 +473,11 @@ outer:
 		}
 		values = append(values, pval)
 	}
-	for _, child := range children {
-		node.AddNode(child)
+
+	if node != nil {
+		for _, child := range children {
+			node.AddNode(child)
+		}
 	}
 
 	return &cfArray{values}
