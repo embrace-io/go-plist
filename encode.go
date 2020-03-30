@@ -61,6 +61,29 @@ func (p *Encoder) Encode(v interface{}) (err error) {
 	return
 }
 
+func (p *Encoder) EncodeWithMeta(v interface{}, meta *Meta) (err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			if _, ok := r.(runtime.Error); ok {
+				panic(r)
+			}
+			err = r.(error)
+		}
+	}()
+
+	pval := p.marshal(reflect.ValueOf(v))
+	if pval == nil {
+		panic(errors.New("plist: no root element to encode"))
+	}
+
+	// Only OpenStepFormat supported for now.
+	g := newTextPlistGenerator(p.writer, p.format)
+	g.meta = meta
+	g.Indent(p.indent)
+	g.generateDocument(pval)
+	return
+}
+
 // Indent turns on pretty-printing for the XML and Text property list formats.
 // Each element begins on a new line and is preceded by one or more copies of indent according to its nesting depth.
 func (p *Encoder) Indent(indent string) {
@@ -130,6 +153,20 @@ func MarshalIndent(v interface{}, format int, indent string) ([]byte, error) {
 	enc := NewEncoderForFormat(buf, format)
 	enc.Indent(indent)
 	if err := enc.Encode(v); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
+// TODO: Change to pass in modifier funcs?
+func MarshalIndentWithMeta(v interface{}, format int, indent string, meta *Meta) ([]byte, error) {
+	if format != OpenStepFormat {
+		return nil, errors.New("only OpenStep format supported")
+	}
+	buf := &bytes.Buffer{}
+	enc := NewEncoderForFormat(buf, format)
+	enc.Indent(indent)
+	if err := enc.EncodeWithMeta(v, meta); err != nil {
 		return nil, err
 	}
 	return buf.Bytes(), nil

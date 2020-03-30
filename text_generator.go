@@ -17,6 +17,8 @@ type textPlistGenerator struct {
 	depth  int
 
 	dictKvDelimiter, dictEntryDelimiter, arrayDelimiter []byte
+
+	meta *Meta
 }
 
 var (
@@ -29,10 +31,15 @@ var (
  */
 
 func (p *textPlistGenerator) generateDocument(pval cfValue) {
-	p.writePlistValue(pval)
+	// Root
+	var nodes []Node
+	if p.meta != nil && len(p.meta.Nodes) > 0 {
+		nodes = p.meta.Nodes[0].Nodes() // First is always the root of the document.
+	}
+	p.writePlistValue(pval, nodes...)
 }
 
-func (p *textPlistGenerator) plistQuotedString(str string) string {
+func (p *textPlistGenerator) plistQuotedString(str string, node Node) string {
 	if str == "" {
 		return `""`
 	}
@@ -80,6 +87,14 @@ func (p *textPlistGenerator) plistQuotedString(str string) string {
 	if quot {
 		s = `"` + s + `"`
 	}
+	if node != nil {
+		if annotations := node.Annotations(); len(annotations) > 0 {
+			for _, annotation := range annotations {
+				s += " " + annotation.Value()
+			}
+		}
+
+	}
 	return s
 }
 
@@ -108,7 +123,7 @@ func (p *textPlistGenerator) writeIndent() {
 	This would need to take in a meta value and enrich the node.
 
 */
-func (p *textPlistGenerator) writePlistValue(pval cfValue) {
+func (p *textPlistGenerator) writePlistValue(pval cfValue, nodes ...Node) {
 	if pval == nil {
 		return
 	}
@@ -135,8 +150,11 @@ func (p *textPlistGenerator) writePlistValue(pval cfValue) {
 		}
 	*/
 
+	//for _, node := range nodes {
+	//
+	//}
 
-
+	m := nodeListToMap(nodes)
 	switch pval := pval.(type) {
 	// Add case *cfAnnotation
 	case *cfDictionary:
@@ -145,9 +163,14 @@ func (p *textPlistGenerator) writePlistValue(pval cfValue) {
 		p.deltaIndent(1)
 		for i, k := range pval.keys {
 			p.writeIndent()
-			io.WriteString(p.writer, p.plistQuotedString(k))
+			node := m[k]
+			var nodes []Node
+			if node != nil {
+				nodes = node.Nodes()
+			}
+			io.WriteString(p.writer, p.plistQuotedString(k, node)) // TODO: Pass in corresponding node
 			p.writer.Write(p.dictKvDelimiter)
-			p.writePlistValue(pval.values[i])
+			p.writePlistValue(pval.values[i], nodes...) // TODO: Pass in corresponding node
 			p.writer.Write(p.dictEntryDelimiter)
 		}
 		p.deltaIndent(-1)
@@ -158,14 +181,15 @@ func (p *textPlistGenerator) writePlistValue(pval cfValue) {
 		p.deltaIndent(1)
 		for _, v := range pval.values {
 			p.writeIndent()
-			p.writePlistValue(v)
+			p.writePlistValue(v, nodes...)
 			p.writer.Write(p.arrayDelimiter)
 		}
 		p.deltaIndent(-1)
 		p.writeIndent()
 		p.writer.Write([]byte(`)`))
 	case cfString:
-		io.WriteString(p.writer, p.plistQuotedString(string(pval)))
+		node := m[string(pval)]
+		io.WriteString(p.writer, p.plistQuotedString(string(pval), node))
 	case *cfNumber:
 		if p.format == GNUStepFormat {
 			p.writer.Write([]byte(`<*I`))
@@ -229,7 +253,7 @@ func (p *textPlistGenerator) writePlistValue(pval cfValue) {
 			io.WriteString(p.writer, time.Time(pval).In(time.UTC).Format(textPlistTimeLayout))
 			p.writer.Write([]byte(`>`))
 		} else {
-			io.WriteString(p.writer, p.plistQuotedString(time.Time(pval).In(time.UTC).Format(textPlistTimeLayout)))
+			io.WriteString(p.writer, p.plistQuotedString(time.Time(pval).In(time.UTC).Format(textPlistTimeLayout), nil))
 		}
 	case cfUID:
 		p.writePlistValue(pval.toDict())
