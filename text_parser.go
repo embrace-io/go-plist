@@ -425,8 +425,8 @@ outer:
 				valueComments = append(valueComments, "")
 			}
 
-			if node != nil && valueNode != nil {
-				node.AddNode(valueNode)
+			if child != nil && valueNode != nil {
+				child.AddNode(valueNode)
 			}
 
 			if p.next() != ';' {
@@ -457,7 +457,7 @@ outer:
 }
 
 // the ( has already been consumed
-func (p *textPlistParser) parseArray() *cfArray {
+func (p *textPlistParser) parseArray(node Node) *cfArray {
 	//p.ignore() // ignore the (
 	values := make([]cfValue, 0, 32)
 outer:
@@ -475,12 +475,17 @@ outer:
 			p.backup()
 		}
 
+		//child := &MetaNode{}
 		pval := p.parsePlistValue(nil) // whitespace is consumed within
 		if str, ok := pval.(cfString); ok && string(str) == "" {
 			// Empty strings in arrays are apparently skipped?
 			// TODO: Figure out why this was implemented.
 			continue
 		}
+		//if str, ok := pval.(cfString); ok {
+		//	child.SetValue(string(str))
+		//}
+		//node.AddNode(child)
 		values = append(values, pval)
 	}
 	return &cfArray{values}
@@ -600,10 +605,10 @@ func (p *textPlistParser) parsePlistValue(node Node) cfValue {
 			//}
 
 		case '(':
-			val = p.parseArray()
+			val = p.parseArray(node)
 		default:
 			p.backup()
-			val =  p.parseUnquotedString()
+			val = p.parseUnquotedString()
 			//if node != nil {
 			//	node.AddNode(&MetaNode{value:string(val.(cfString))})
 			//}
