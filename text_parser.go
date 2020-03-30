@@ -356,7 +356,7 @@ outer:
 		if comments != nil && node != nil {
 			for _, comment := range comments {
 				// Need to better distinguish adding annotations to node, vs adding node level annotation node
-				node.AddNode(&Annotation{value:comment})
+				node.AddNode(NewAnnotation(comment))
 			}
 		}
 
@@ -384,7 +384,7 @@ outer:
 		comments = p.skipWhitespaceAndComments()
 		if comments != nil && node != nil {
 			for _, comment := range comments {
-				child.addAnnotation(comment)
+				child.AddAnnotation(NewAnnotation(comment))
 			}
 		}
 
@@ -405,7 +405,7 @@ outer:
 			if comments != nil {
 				if valueNode != nil {
 					for _, comment := range comments {
-						valueNode.AddAnnotation(comment)
+						valueNode.AddAnnotation(NewAnnotation(comment))
 					}
 				}
 			}
@@ -445,7 +445,7 @@ outer:
 		if comments != nil {
 			child := children[len(children) - 1]
 			for _, comment := range comments {
-				child.AddAnnotation(comment)
+				child.AddAnnotation(NewAnnotation(comment))
 			}
 		}
 
