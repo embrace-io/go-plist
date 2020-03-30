@@ -86,7 +86,8 @@ func (p *textPlistParser) parseDocument() (pval cfValue, parseError error) {
 
 	var node Node
 	if p.meta != nil {
-		node = &MetaNode{value: "root"}
+		// Root node
+		node = NewMetaNode()
 	}
 
 	val := p.parsePlistValue(node)
