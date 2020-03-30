@@ -370,9 +370,14 @@ outer:
 		// INVARIANT: key can't be nil; parseQuoted and parseUnquoted
 		// will panic out before they return nil.
 
+		child := &MetaNode{value:string(keypv.(cfString))}
+
 		// Outer object
 		comments = p.skipWhitespaceAndComments()
-		if comments != nil {
+		if comments != nil && node != nil {
+			for _, comment := range comments {
+				child.addAnnotation(comment)
+			}
 			keyComments = append(keyComments, comments...)
 			//if node != nil {
 			//	for _, comment := range comments {
@@ -383,13 +388,17 @@ outer:
 			keyComments = append(keyComments, "")
 		}
 
-		child := &MetaNode{value:string(keypv.(cfString))}
+
+		//finalNode := &MetaNode{}
 
 		var val cfValue
 		n := p.next()
 		if n == ';' {
 			val = keypv
-			node.AddNode(&MetaNode{value:string(val.(cfString))})
+			//finalNode.SetValue(string(val.(cfString)))
+			//addFinalNode = true
+
+			//node.AddNode()
 		} else if n == '=' {
 			// whitespace is consumed within
 			//child := &MetaNode{}
@@ -397,13 +406,27 @@ outer:
 			//if node != nil {
 			//	node.AddNode(child)
 			//}
+			var valueNode *MetaNode
+			if strVal, ok := val.(cfString); ok {
+				valueNode = &MetaNode{value: string(strVal)}
+			}
 
 			// Child object
 			comments = p.skipWhitespaceAndComments()
 			if comments != nil {
 				valueComments = append(valueComments, comments...)
+				if valueNode != nil {
+					for _, comment := range comments {
+						valueNode.AddAnnotation(comment)
+						//finalNode.AddAnnotation(comment)
+					}
+				}
 			} else {
 				valueComments = append(valueComments, "")
+			}
+
+			if node != nil && valueNode != nil {
+				node.AddNode(valueNode)
 			}
 
 			if p.next() != ';' {
@@ -412,6 +435,10 @@ outer:
 		} else {
 			p.error("missing = in dictionary")
 		}
+
+		//if addFinalNode {
+		//	node.AddNode(finalNode)
+		//}
 
 		//if node != nil {
 		//	node.SetValue(string(keypv.(cfString)))
@@ -562,9 +589,9 @@ func (p *textPlistParser) parsePlistValue(node Node) cfValue {
 			return p.parseHexData()
 		case '"':
 			val = p.parseQuotedString()
-			if node != nil {
-				node.AddNode(&MetaNode{value:string(val.(cfString))})
-			}
+			//if node != nil {
+			//	node.AddNode(&MetaNode{value:string(val.(cfString))})
+			//}
 		case '{':
 			//child := &MetaNode{}
 			val = p.parseDictionary(false, node)
@@ -577,9 +604,9 @@ func (p *textPlistParser) parsePlistValue(node Node) cfValue {
 		default:
 			p.backup()
 			val =  p.parseUnquotedString()
-			if node != nil {
-				node.AddNode(&MetaNode{value:string(val.(cfString))})
-			}
+			//if node != nil {
+			//	node.AddNode(&MetaNode{value:string(val.(cfString))})
+			//}
 		}
 
 		return val
