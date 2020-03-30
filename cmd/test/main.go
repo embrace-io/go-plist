@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"strings"
 
 	"howett.net/plist"
 )
@@ -28,10 +29,6 @@ func (o PBXObject) ToPBXShellScriptBuildPhase(id string) PBXShellScriptBuildPhas
 	phase.ISA = o.ISA
 	phase.ID = id
 	return phase
-}
-
-type Commented struct {
-
 }
 
 type PBXShellScriptBuildPhase struct {
@@ -58,7 +55,8 @@ func main() {
 
 	var proj PBXProj
 	decoder := plist.NewDecoder(buf)
-	err = decoder.Decode(&proj)
+	meta := plist.NewMeta()
+	err = decoder.DecodeWithMeta(&proj, meta)
 	if err != nil {
 		log.Fatal(err)
 		return
@@ -67,7 +65,7 @@ func main() {
 	//shellScripts := proj.shellScriptBuildPhases()
 	//fmt.Printf(">>> %+v\n", proj.Comments)
 
-	updated, err := plist.MarshalIndent(proj, plist.OpenStepFormat, "  ")
+	_, err = plist.MarshalIndent(proj, plist.OpenStepFormat, "  ")
 	//writeBuf := &bytes.Buffer{}
 	//encoder := plist.NewEncoder(writeBuf)
 	//err = encoder.Encode(shellScripts)
@@ -75,5 +73,16 @@ func main() {
 		log.Fatal(err)
 		return
 	}
-	fmt.Printf("RUNNING TEST %v\n", string(updated))
+	//fmt.Printf("RUNNING TEST %v\n", string(updated))
+
+	fmt.Println("NODES:")
+	showNodes(meta.Nodes, 1)
+}
+
+func showNodes(nodes []plist.Node, level int) {
+	pre := strings.Repeat("-", level)
+	for _, n := range nodes {
+		fmt.Printf("%v %v\n", pre, n.Value())
+		showNodes(n.Nodes(), level + 1)
+	}
 }
