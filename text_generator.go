@@ -24,6 +24,10 @@ var (
 	padding             = "0000"
 )
 
+/*
+	generateDocument(pVal cfValue, meta Meta)
+ */
+
 func (p *textPlistGenerator) generateDocument(pval cfValue) {
 	p.writePlistValue(pval)
 }
@@ -99,12 +103,42 @@ func (p *textPlistGenerator) writeIndent() {
 	}
 }
 
+/*
+	writePlistValue(pval cfValue, meta Meta)
+	This would need to take in a meta value and enrich the node.
+
+*/
 func (p *textPlistGenerator) writePlistValue(pval cfValue) {
 	if pval == nil {
 		return
 	}
 
+	/*
+		This is where we need to create a list of pvals using Meta.
+
+			[]cfValue{
+				Annotation{}, // Header comment
+				pval, // Actual body
+				Annotation{}, // Comment after body
+			}
+
+		We can then recursively call writePlistValue until meta is empty
+	*/
+
+	/*
+		if m := meta.forValue(pval); m != nil {
+			values := m.values(pval)
+			for _, v := range {
+				writePlistValue(v)
+			}
+			return
+		}
+	*/
+
+
+
 	switch pval := pval.(type) {
+	// Add case *cfAnnotation
 	case *cfDictionary:
 		pval.sort()
 		p.writer.Write([]byte(`{`))

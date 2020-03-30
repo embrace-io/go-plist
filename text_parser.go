@@ -176,13 +176,17 @@ func (p *textPlistParser) scanCharactersNotInSet(ch *characterSet) {
 	p.backup()
 }
 
-func (p *textPlistParser) skipWhitespaceAndComments() {
+func (p *textPlistParser) skipWhitespaceAndComments() []string {
+	var comments []string
 	for {
 		p.scanCharactersInSet(&whitespace)
 		if strings.HasPrefix(p.input[p.pos:], "//") {
 			p.scanCharactersNotInSet(&newlineCharacterSet)
 		} else if strings.HasPrefix(p.input[p.pos:], "/*") {
 			if x := strings.Index(p.input[p.pos:], "*/"); x >= 0 {
+				str := p.input[p.pos:p.pos + x + 2]
+				//fmt.Printf("comment str >> %v, %v, %v", p.pos, x, str)
+				comments = append(comments, str)
 				p.pos += x + 2 // skip the */ as well
 				continue       // consume more whitespace
 			} else {
@@ -193,6 +197,7 @@ func (p *textPlistParser) skipWhitespaceAndComments() {
 		}
 	}
 	p.ignore()
+	return comments
 }
 
 func (p *textPlistParser) parseOctalDigits(max int) uint64 {
@@ -271,6 +276,18 @@ func (p *textPlistParser) parseEscape() string {
 	return s
 }
 
+// the / has already been consumed
+func (p *textPlistParser) parseComment() {
+
+	// Open inline
+	if p.peek() == '*' {
+		p.scanUntilAny("*/")
+		commentStr := p.emit()
+		fmt.Println(commentStr)
+	}
+
+}
+
 // the " has already been consumed
 func (p *textPlistParser) parseQuotedString() cfString {
 	p.ignore() // ignore the "
@@ -317,9 +334,17 @@ func (p *textPlistParser) parseDictionary(ignoreEof bool) cfValue {
 	var keypv cfValue
 	keys := make([]string, 0, 32)
 	values := make([]cfValue, 0, 32)
+
+	keyComments := make([]string, 0, 32)
+	valueComments := make([]string, 0, 32)
+
 outer:
 	for {
-		p.skipWhitespaceAndComments()
+		// Section comments
+		comments := p.skipWhitespaceAndComments()
+		if comments != nil {
+			fmt.Println(comments)
+		}
 
 		switch p.next() {
 		case eof:
@@ -331,6 +356,8 @@ outer:
 			break outer
 		case '"':
 			keypv = p.parseQuotedString()
+		//case '/':
+		//	p.parseComment()
 		default:
 			p.backup()
 			keypv = p.parseUnquotedString()
@@ -339,7 +366,13 @@ outer:
 		// INVARIANT: key can't be nil; parseQuoted and parseUnquoted
 		// will panic out before they return nil.
 
-		p.skipWhitespaceAndComments()
+		// Outer object
+		comments = p.skipWhitespaceAndComments()
+		if comments != nil {
+			keyComments = append(keyComments, comments...)
+		} else {
+			keyComments = append(keyComments, "")
+		}
 
 		var val cfValue
 		n := p.next()
@@ -349,7 +382,13 @@ outer:
 			// whitespace is consumed within
 			val = p.parsePlistValue()
 
-			p.skipWhitespaceAndComments()
+			// Child object
+			comments = p.skipWhitespaceAndComments()
+			if comments != nil {
+				valueComments = append(valueComments, comments...)
+			} else {
+				valueComments = append(valueComments, "")
+			}
 
 			if p.next() != ';' {
 				p.error("missing ; in dictionary")
@@ -362,7 +401,7 @@ outer:
 		values = append(values, val)
 	}
 
-	dict := &cfDictionary{keys: keys, values: values}
+	dict := &cfDictionary{keys: keys, values: values, keyComments: keyComments, valueComments: valueComments}
 	return dict.maybeUID(p.format == OpenStepFormat)
 }
 

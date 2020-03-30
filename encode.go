@@ -32,6 +32,16 @@ func (p *Encoder) Encode(v interface{}) (err error) {
 		}
 	}()
 
+	/*
+
+	EncodeWithMeta(v interface{}, meta Meta)
+
+	This would need to enrich v with things from m.
+	- Convert section comments into cfValues
+		* Add Annotation type and make it implement cfValue
+	- Pass in meta object into generateDocument
+	 */
+
 	pval := p.marshal(reflect.ValueOf(v))
 	if pval == nil {
 		panic(errors.New("plist: no root element to encode"))

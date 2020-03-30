@@ -20,6 +20,27 @@ type Decoder struct {
 	lax    bool
 }
 
+/*
+	Pass in pointer to meta struct to receive meta info
+
+	func (p *Decoder) DecodeWithMeta(v interface{}, meta *Meta) {
+		// Since we're only supporting text parser, just initialize and use
+		// the text parser.
+
+		// Initialize the textParser with Meta.
+		p := newTextPlistParser(p.reader)
+		pval, err = p.parseDocument()
+		if err != nil {
+			return err
+		}
+		p.Format = OpenStepFormat
+		p.lax = true
+		p.unmarshal(pval, reflect.ValueOf(v))
+		return
+	}
+*/
+
+
 // Decode works like Unmarshal, except it reads the decoder stream to find property list elements.
 //
 // After Decoding, the Decoder's Format field will be set to one of the plist format constants.

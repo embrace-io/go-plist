@@ -19,6 +19,9 @@ type cfValue interface {
 type cfDictionary struct {
 	keys   sort.StringSlice
 	values []cfValue
+
+	keyComments []string
+	valueComments []string
 }
 
 func (*cfDictionary) typeName() string {
