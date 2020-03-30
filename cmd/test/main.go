@@ -82,7 +82,14 @@ func main() {
 func showNodes(nodes []plist.Node, level int) {
 	pre := strings.Repeat("-", level)
 	for _, n := range nodes {
-		fmt.Printf("%v %v\n", pre, n.Value())
+		var post string
+		annotations := n.Annotations()
+		if len(annotations) > 0 {
+			for _, a := range annotations {
+				post += " " + a.Value()
+			}
+		}
+		fmt.Printf("%v %v %v\n", pre, n.Value(), post)
 		showNodes(n.Nodes(), level + 1)
 	}
 }

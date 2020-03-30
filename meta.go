@@ -5,11 +5,13 @@ type Meta struct {
 }
 
 type Node interface {
+	AddAnnotation(val string)
 	Annotations() []Annotation
 	Value() string
 	Nodes() []Node
 	AddNode(node Node)
 	SetValue(val string)
+	//AddChildAnnotation(key, val string)
 }
 
 //type Node struct {
@@ -20,6 +22,7 @@ type MetaNode struct {
 	value string
 	annotations []Annotation
 	nodes []Node
+	childAnnotations map[string]Annotation
 }
 
 func (n *MetaNode) Nodes() []Node {
@@ -29,6 +32,21 @@ func (n *MetaNode) Nodes() []Node {
 func (n *MetaNode) Annotations() []Annotation {
 	return n.annotations
 }
+
+func (n *MetaNode) AddAnnotation(val string) {
+	if n.annotations == nil {
+		n.annotations = []Annotation{}
+	}
+	n.annotations = append(n.annotations, Annotation{value:val})
+}
+
+func (n *MetaNode) AddChildAnnotation(key, value string) {
+	if n.childAnnotations == nil {
+		n.childAnnotations = make(map[string]Annotation)
+	}
+	n.childAnnotations[key] = Annotation{value:value}
+}
+
 
 func (n *MetaNode) Value() string {
 	return n.value
@@ -42,6 +60,12 @@ func (n *MetaNode) AddNode(node Node) {
 	if n.nodes == nil {
 		n.nodes = []Node{}
 	}
+	//if n.childAnnotations == nil {
+	//	n.childAnnotations = make(map[string]Annotation)
+	//}
+	//if annotation, ok := n.childAnnotations[node.Value()]; ok {
+	//	node.AddAnnotation(annotation.Value())
+	//}
 	n.nodes = append(n.nodes, node)
 }
 
@@ -69,6 +93,10 @@ func (n *Annotation) Nodes() []Node {
 }
 
 func (*Annotation) AddNode(_ Node) {
+
+}
+
+func (*Annotation) AddAnnotation(_ string) {
 
 }
 
