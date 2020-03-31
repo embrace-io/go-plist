@@ -190,6 +190,15 @@ func (p *textPlistParser) scanCharactersNotInSet(ch *characterSet) {
 	p.backup()
 }
 
+func (p *textPlistParser) parseCommentNodes(node Node) {
+	if comments := p.skipWhitespaceAndComments(); comments != nil && node != nil {
+		for _, comment := range comments {
+			// Section comments are node level.
+			node.AddNode(NewAnnotation(comment))
+		}
+	}
+}
+
 func (p *textPlistParser) skipWhitespaceAndComments() []string {
 	var comments []string
 	for {
@@ -340,12 +349,7 @@ func (p *textPlistParser) parseDictionary(ignoreEof bool, node Node) cfValue {
 outer:
 	for {
 		// Section comments
-		if comments := p.skipWhitespaceAndComments(); comments != nil && node != nil {
-			for _, comment := range comments {
-				// Section comments are node level.
-				node.AddNode(NewAnnotation(comment))
-			}
-		}
+		p.parseCommentNodes(node)
 
 		switch p.next() {
 		case eof:
@@ -425,8 +429,7 @@ func (p *textPlistParser) parseArray(node Node) *cfArray {
 outer:
 	for {
 
-		comments := p.skipWhitespaceAndComments()
-		if comments != nil {
+		if comments := p.skipWhitespaceAndComments(); comments != nil {
 			child := children[len(children) - 1]
 			for _, comment := range comments {
 				child.AddAnnotation(NewAnnotation(comment))
@@ -553,12 +556,7 @@ func (p *textPlistParser) parseHexData() cfData {
 
 func (p *textPlistParser) parsePlistValue(node Node) cfValue {
 	for {
-		if comments := p.skipWhitespaceAndComments(); comments != nil && node != nil {
-			for _, comment := range comments {
-				// Node level annotations.
-				node.AddNode(NewAnnotation(comment))
-			}
-		}
+		p.parseCommentNodes(node)
 
 		switch p.next() {
 		case eof:
