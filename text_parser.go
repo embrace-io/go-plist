@@ -21,6 +21,8 @@ type textPlistParser struct {
 	start int
 	pos   int
 	width int
+
+	meta *Meta
 }
 
 func convertU16(buffer []byte, bo binary.ByteOrder) (string, error) {
@@ -82,9 +84,21 @@ func (p *textPlistParser) parseDocument() (pval cfValue, parseError error) {
 		panic(err)
 	}
 
-	val := p.parsePlistValue()
+	var node Node
+	if p.meta != nil {
+		// Root node
+		node = NewMetaNode()
+	}
 
+	val := p.parsePlistValue(node)
+
+	if p.meta != nil {
+		p.meta.addNode(node)
+	}
+
+	// TODO: Grab comments at end of document?
 	p.skipWhitespaceAndComments()
+
 	if p.peek() != eof {
 		if _, ok := val.(cfString); !ok {
 			p.error("garbage after end of document")
@@ -92,7 +106,7 @@ func (p *textPlistParser) parseDocument() (pval cfValue, parseError error) {
 
 		p.start = 0
 		p.pos = 0
-		val = p.parseDictionary(true)
+		val = p.parseDictionary(true, nil)
 	}
 
 	pval = val
@@ -176,13 +190,26 @@ func (p *textPlistParser) scanCharactersNotInSet(ch *characterSet) {
 	p.backup()
 }
 
-func (p *textPlistParser) skipWhitespaceAndComments() {
+func (p *textPlistParser) parseCommentNodes(node Node) {
+	if comments := p.skipWhitespaceAndComments(); comments != nil && node != nil {
+		for _, comment := range comments {
+			// Section comments are node level.
+			node.AddNode(NewAnnotation(comment))
+		}
+	}
+}
+
+func (p *textPlistParser) skipWhitespaceAndComments() []string {
+	var comments []string
 	for {
 		p.scanCharactersInSet(&whitespace)
 		if strings.HasPrefix(p.input[p.pos:], "//") {
 			p.scanCharactersNotInSet(&newlineCharacterSet)
+			comments = append(comments, p.emit())
 		} else if strings.HasPrefix(p.input[p.pos:], "/*") {
 			if x := strings.Index(p.input[p.pos:], "*/"); x >= 0 {
+				str := p.input[p.pos:p.pos + x + 2]
+				comments = append(comments, str)
 				p.pos += x + 2 // skip the */ as well
 				continue       // consume more whitespace
 			} else {
@@ -193,6 +220,7 @@ func (p *textPlistParser) skipWhitespaceAndComments() {
 		}
 	}
 	p.ignore()
+	return comments
 }
 
 func (p *textPlistParser) parseOctalDigits(max int) uint64 {
@@ -312,14 +340,16 @@ func (p *textPlistParser) parseUnquotedString() cfString {
 }
 
 // the { has already been consumed
-func (p *textPlistParser) parseDictionary(ignoreEof bool) cfValue {
+func (p *textPlistParser) parseDictionary(ignoreEof bool, node Node) cfValue {
 	//p.ignore() // ignore the {
 	var keypv cfValue
 	keys := make([]string, 0, 32)
 	values := make([]cfValue, 0, 32)
+
 outer:
 	for {
-		p.skipWhitespaceAndComments()
+		// Section comments
+		p.parseCommentNodes(node)
 
 		switch p.next() {
 		case eof:
@@ -339,7 +369,13 @@ outer:
 		// INVARIANT: key can't be nil; parseQuoted and parseUnquoted
 		// will panic out before they return nil.
 
-		p.skipWhitespaceAndComments()
+		child := NewMetaNode()
+		child.SetValue(string(keypv.(cfString)))
+		if comments := p.skipWhitespaceAndComments(); comments != nil && node != nil {
+			for _, comment := range comments {
+				child.AddAnnotation(NewAnnotation(comment))
+			}
+		}
 
 		var val cfValue
 		n := p.next()
@@ -347,15 +383,34 @@ outer:
 			val = keypv
 		} else if n == '=' {
 			// whitespace is consumed within
-			val = p.parsePlistValue()
+			val = p.parsePlistValue(child)
+			var valueNode *MetaNode
+			if strVal, ok := val.(cfString); ok {
+				valueNode = &MetaNode{value: string(strVal)}
+			}
 
-			p.skipWhitespaceAndComments()
+			// Child object
+			if comments := p.skipWhitespaceAndComments(); comments != nil {
+				if valueNode != nil {
+					for _, comment := range comments {
+						valueNode.AddAnnotation(NewAnnotation(comment))
+					}
+				}
+			}
+
+			if child != nil && valueNode != nil {
+				child.AddNode(valueNode)
+			}
 
 			if p.next() != ';' {
 				p.error("missing ; in dictionary")
 			}
 		} else {
 			p.error("missing = in dictionary")
+		}
+
+		if node != nil {
+			node.AddNode(child)
 		}
 
 		keys = append(keys, string(keypv.(cfString)))
@@ -367,12 +422,19 @@ outer:
 }
 
 // the ( has already been consumed
-func (p *textPlistParser) parseArray() *cfArray {
+func (p *textPlistParser) parseArray(node Node) *cfArray {
 	//p.ignore() // ignore the (
 	values := make([]cfValue, 0, 32)
+	children := make([]Node, 0, 32)
 outer:
 	for {
-		p.skipWhitespaceAndComments()
+
+		if comments := p.skipWhitespaceAndComments(); comments != nil {
+			child := children[len(children) - 1]
+			for _, comment := range comments {
+				child.AddAnnotation(NewAnnotation(comment))
+			}
+		}
 
 		switch p.next() {
 		case eof:
@@ -385,14 +447,26 @@ outer:
 			p.backup()
 		}
 
-		pval := p.parsePlistValue() // whitespace is consumed within
+		child := NewMetaNode()
+		pval := p.parsePlistValue(child) // whitespace is consumed within
 		if str, ok := pval.(cfString); ok && string(str) == "" {
 			// Empty strings in arrays are apparently skipped?
 			// TODO: Figure out why this was implemented.
 			continue
 		}
+		if str, ok := pval.(cfString); ok {
+			child.SetValue(string(str))
+			children = append(children, child)
+		}
 		values = append(values, pval)
 	}
+
+	if node != nil {
+		for _, child := range children {
+			node.AddNode(child)
+		}
+	}
+
 	return &cfArray{values}
 }
 
@@ -480,9 +554,9 @@ func (p *textPlistParser) parseHexData() cfData {
 	}
 }
 
-func (p *textPlistParser) parsePlistValue() cfValue {
+func (p *textPlistParser) parsePlistValue(node Node) cfValue {
 	for {
-		p.skipWhitespaceAndComments()
+		p.parseCommentNodes(node)
 
 		switch p.next() {
 		case eof:
@@ -498,9 +572,9 @@ func (p *textPlistParser) parsePlistValue() cfValue {
 		case '"':
 			return p.parseQuotedString()
 		case '{':
-			return p.parseDictionary(false)
+			return p.parseDictionary(false, node)
 		case '(':
-			return p.parseArray()
+			return p.parseArray(node)
 		default:
 			p.backup()
 			return p.parseUnquotedString()
