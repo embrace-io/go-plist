@@ -143,7 +143,7 @@ func (p *textPlistGenerator) writePlistValue(pval cfValue, nodes ...Node) {
 			}
 
 			if annotation, ok := node.(*Annotation); ok {
-				p.writePlistValue(cfAnnotation{value:annotation.value})
+				p.writePlistValue(p.plistAnnotation(annotation.Value()))
 				continue
 			}
 

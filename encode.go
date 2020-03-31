@@ -61,6 +61,7 @@ func (p *Encoder) Encode(v interface{}) (err error) {
 	return
 }
 
+// TODO: add doc comments.
 func (p *Encoder) EncodeWithMeta(v interface{}, meta *Meta) (err error) {
 	defer func() {
 		if r := recover(); r != nil {
