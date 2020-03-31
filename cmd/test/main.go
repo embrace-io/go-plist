@@ -17,6 +17,9 @@ type PBXProj struct {
 	ObjectVersion  int                  `plist:"objectVersion"`
 	Objects        map[string]PBXObject `plist:"objects"`
 	RootObject     string               `plist:"rootObject"`
+	//Classes map[string]interface{} `plist:"classes"`
+
+	// TODO: Add classes
 }
 
 // Generic object

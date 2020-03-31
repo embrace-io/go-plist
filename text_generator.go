@@ -150,27 +150,67 @@ func (p *textPlistGenerator) writePlistValue(pval cfValue, nodes ...Node) {
 		}
 	*/
 
-	//for _, node := range nodes {
-	//
-	//}
 
+	// For inline stuff
+	// TODO: Will this fail if we have duplicate items in an array?
 	m := nodeListToMap(nodes)
+
 	switch pval := pval.(type) {
-	// Add case *cfAnnotation
 	case *cfDictionary:
-		pval.sort()
+		var nodesToUse []Node
+		kv := map[string]cfValue{}
+		for i, k := range pval.keys {
+			kv[k] = pval.values[i]
+		}
+		var keys []string
+		var values []cfValue
+		if len(nodes) > 0 {
+			for _, node := range nodes {
+				// Would duplicate comments get mangled?
+				var addNode bool
+				if _, ok := node.(*Annotation); ok {
+					keys = append(keys, node.Value())
+					values = append(values, nil)
+					addNode = true
+				}
+				if _, ok := node.(*MetaNode); ok {
+					if v, ok := kv[node.Value()]; ok {
+						keys = append(keys, node.Value())
+						values = append(values, v)
+						addNode = true
+					}
+				}
+				if addNode {
+					nodesToUse = append(nodesToUse, node)
+				}
+			}
+		} else {
+			keys = pval.keys
+			values = pval.values
+			pval.sort()
+		}
+
 		p.writer.Write([]byte(`{`))
 		p.deltaIndent(1)
-		for i, k := range pval.keys {
-			p.writeIndent()
-			node := m[k]
+		for i, k := range keys {
+			var node Node
+			if len(nodesToUse) > i {
+				node = nodesToUse[i]
+			}
 			var nodes []Node
 			if node != nil {
 				nodes = node.Nodes()
 			}
+
+			if annotation, ok := node.(*Annotation); ok {
+				p.writePlistValue(cfAnnotation{value:annotation.value})
+				continue
+			}
+
+			p.writeIndent()
 			io.WriteString(p.writer, p.plistQuotedString(k, node)) // TODO: Pass in corresponding node
 			p.writer.Write(p.dictKvDelimiter)
-			p.writePlistValue(pval.values[i], nodes...) // TODO: Pass in corresponding node
+			p.writePlistValue(values[i], nodes...) // TODO: Pass in corresponding node
 			p.writer.Write(p.dictEntryDelimiter)
 		}
 		p.deltaIndent(-1)
@@ -257,6 +297,9 @@ func (p *textPlistGenerator) writePlistValue(pval cfValue, nodes ...Node) {
 		}
 	case cfUID:
 		p.writePlistValue(pval.toDict())
+	case cfAnnotation:
+		// TODO: Get newline from annotation
+		io.WriteString(p.writer, "\n" + pval.value + "\n")
 	}
 }
 

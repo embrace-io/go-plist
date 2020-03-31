@@ -46,6 +46,34 @@ func (p *cfDictionary) sort() {
 	sort.Sort(p)
 }
 
+func (c *cfDictionary) sortWithMeta(nodes []Node) {
+	// key -> index
+	m := make(map[string]int)
+	for i, node := range nodes {
+		m[node.Value()] = i
+	}
+	type kvi struct {
+		key string
+		value cfValue
+		index int
+	}
+	list := make([]kvi, len(c.keys))
+	for i, key := range c.keys {
+		list[i] = kvi{
+			key:   key,
+			value: c.values[i],
+			index: i,
+		}
+	}
+	sort.Slice(list, func (i, j int) bool {
+		return list[i].index < list[j].index
+	})
+	for i, item := range list {
+		c.keys[i] = item.key
+		c.values[i] = item.value
+	}
+}
+
 func (p *cfDictionary) maybeUID(lax bool) cfValue {
 	if len(p.keys) == 1 && p.keys[0] == "CF$UID" && len(p.values) == 1 {
 		pval := p.values[0]
@@ -169,4 +197,16 @@ func (cfDate) typeName() string {
 
 func (p cfDate) hash() interface{} {
 	return time.Time(p)
+}
+
+type cfAnnotation struct {
+	value string
+}
+
+func (cfAnnotation) typeName() string {
+	return "annotation"
+}
+
+func (p cfAnnotation) hash() interface{} {
+	return p.value
 }
