@@ -26,12 +26,7 @@ var (
 	padding             = "0000"
 )
 
-/*
-	generateDocument(pVal cfValue, meta Meta)
- */
-
 func (p *textPlistGenerator) generateDocument(pval cfValue) {
-	// Root
 	var nodes []Node
 	if p.meta != nil && len(p.meta.Nodes) > 0 {
 		nodes = p.meta.Nodes[0].Nodes() // First is always the root of the document.
@@ -118,43 +113,10 @@ func (p *textPlistGenerator) writeIndent() {
 	}
 }
 
-/*
-	writePlistValue(pval cfValue, meta Meta)
-	This would need to take in a meta value and enrich the node.
-
-*/
 func (p *textPlistGenerator) writePlistValue(pval cfValue, nodes ...Node) {
 	if pval == nil {
 		return
 	}
-
-	/*
-		This is where we need to create a list of pvals using Meta.
-
-			[]cfValue{
-				Annotation{}, // Header comment
-				pval, // Actual body
-				Annotation{}, // Comment after body
-			}
-
-		We can then recursively call writePlistValue until meta is empty
-	*/
-
-	/*
-		if m := meta.forValue(pval); m != nil {
-			values := m.values(pval)
-			for _, v := range {
-				writePlistValue(v)
-			}
-			return
-		}
-	*/
-
-
-	// For inline stuff
-	// TODO: Will this fail if we have duplicate items in an array?
-	m := nodeListToMap(nodes)
-
 	switch pval := pval.(type) {
 	case *cfDictionary:
 		var nodesToUse []Node
@@ -166,7 +128,6 @@ func (p *textPlistGenerator) writePlistValue(pval cfValue, nodes ...Node) {
 		var values []cfValue
 		if len(nodes) > 0 {
 			for _, node := range nodes {
-				// Would duplicate comments get mangled?
 				var addNode bool
 				if _, ok := node.(*Annotation); ok {
 					keys = append(keys, node.Value())
@@ -228,7 +189,10 @@ func (p *textPlistGenerator) writePlistValue(pval cfValue, nodes ...Node) {
 		p.writeIndent()
 		p.writer.Write([]byte(`)`))
 	case cfString:
-		node := m[string(pval)]
+		var node Node
+		if len(nodes) > 0 {
+			node = nodes[0]
+		}
 		io.WriteString(p.writer, p.plistQuotedString(string(pval), node))
 	case *cfNumber:
 		if p.format == GNUStepFormat {
