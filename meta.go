@@ -98,11 +98,3 @@ func (m *Meta) checkInitialized() {
 		m.Nodes = []Node{}
 	}
 }
-
-func nodeListToMap(nodes []Node) map[string]Node {
-	m := make(map[string]Node)
-	for _, node := range nodes {
-		m[node.Value()] = node
-	}
-	return m
-}

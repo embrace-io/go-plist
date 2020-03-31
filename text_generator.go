@@ -113,41 +113,22 @@ func (p *textPlistGenerator) writeIndent() {
 	}
 }
 
+func (p *textPlistGenerator) plistAnnotation(str string) cfAnnotation {
+	return cfAnnotation{value:str}
+}
+
 func (p *textPlistGenerator) writePlistValue(pval cfValue, nodes ...Node) {
 	if pval == nil {
 		return
 	}
 	switch pval := pval.(type) {
 	case *cfDictionary:
-		var nodesToUse []Node
-		kv := map[string]cfValue{}
-		for i, k := range pval.keys {
-			kv[k] = pval.values[i]
-		}
 		var keys []string
 		var values []cfValue
 		if len(nodes) > 0 {
-			for _, node := range nodes {
-				var addNode bool
-				if _, ok := node.(*Annotation); ok {
-					keys = append(keys, node.Value())
-					values = append(values, nil)
-					addNode = true
-				}
-				if _, ok := node.(*MetaNode); ok {
-					if v, ok := kv[node.Value()]; ok {
-						keys = append(keys, node.Value())
-						values = append(values, v)
-						addNode = true
-					}
-				}
-				if addNode {
-					nodesToUse = append(nodesToUse, node)
-				}
-			}
+			keys, values, nodes = pval.filterNodes(nodes)
 		} else {
-			keys = pval.keys
-			values = pval.values
+			keys, values = pval.keys, pval.values
 			pval.sort()
 		}
 
@@ -155,12 +136,10 @@ func (p *textPlistGenerator) writePlistValue(pval cfValue, nodes ...Node) {
 		p.deltaIndent(1)
 		for i, k := range keys {
 			var node Node
-			if len(nodesToUse) > i {
-				node = nodesToUse[i]
-			}
-			var nodes []Node
-			if node != nil {
-				nodes = node.Nodes()
+			var children []Node
+			if len(nodes) > i {
+				node = nodes[i]
+				children = node.Nodes()
 			}
 
 			if annotation, ok := node.(*Annotation); ok {
@@ -169,9 +148,9 @@ func (p *textPlistGenerator) writePlistValue(pval cfValue, nodes ...Node) {
 			}
 
 			p.writeIndent()
-			io.WriteString(p.writer, p.plistQuotedString(k, node)) // TODO: Pass in corresponding node
+			io.WriteString(p.writer, p.plistQuotedString(k, node))
 			p.writer.Write(p.dictKvDelimiter)
-			p.writePlistValue(values[i], nodes...) // TODO: Pass in corresponding node
+			p.writePlistValue(values[i], children...)
 			p.writer.Write(p.dictEntryDelimiter)
 		}
 		p.deltaIndent(-1)

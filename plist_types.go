@@ -46,32 +46,35 @@ func (p *cfDictionary) sort() {
 	sort.Sort(p)
 }
 
-func (c *cfDictionary) sortWithMeta(nodes []Node) {
-	// key -> index
-	m := make(map[string]int)
-	for i, node := range nodes {
-		m[node.Value()] = i
-	}
-	type kvi struct {
-		key string
-		value cfValue
-		index int
-	}
-	list := make([]kvi, len(c.keys))
-	for i, key := range c.keys {
-		list[i] = kvi{
-			key:   key,
-			value: c.values[i],
-			index: i,
+func (c *cfDictionary) filterNodes(nodes []Node) (keys []string, values []cfValue, filtered []Node) {
+	m := c.toMap()
+	for _, node := range nodes {
+		var add bool
+		if _, ok := node.(*Annotation); ok {
+			keys = append(keys, node.Value())
+			values = append(values, nil)
+			add = true
+		}
+		if _, ok := node.(*MetaNode); ok {
+			if v, ok := m[node.Value()]; ok {
+				keys = append(keys, node.Value())
+				values = append(values, v)
+				add = true
+			}
+		}
+		if add {
+			filtered = append(filtered, node)
 		}
 	}
-	sort.Slice(list, func (i, j int) bool {
-		return list[i].index < list[j].index
-	})
-	for i, item := range list {
-		c.keys[i] = item.key
-		c.values[i] = item.value
+	return keys, values, filtered
+}
+
+func (c *cfDictionary) toMap() map[string]cfValue {
+	m := map[string]cfValue{}
+	for i, k := range c.keys {
+		m[k] = c.values[i]
 	}
+	return m
 }
 
 func (p *cfDictionary) maybeUID(lax bool) cfValue {
