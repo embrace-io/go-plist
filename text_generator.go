@@ -159,9 +159,13 @@ func (p *textPlistGenerator) writePlistValue(pval cfValue, nodes ...Node) {
 	case *cfArray:
 		p.writer.Write([]byte(`(`))
 		p.deltaIndent(1)
-		for _, v := range pval.values {
+		for i, v := range pval.values {
+			var node Node
+			if len(nodes) > i {
+				node = nodes[i]
+			}
 			p.writeIndent()
-			p.writePlistValue(v, nodes...)
+			p.writePlistValue(v, node)
 			p.writer.Write(p.arrayDelimiter)
 		}
 		p.deltaIndent(-1)
