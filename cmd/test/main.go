@@ -17,6 +17,9 @@ type PBXProj struct {
 	ObjectVersion  int                  `plist:"objectVersion"`
 	Objects        map[string]PBXObject `plist:"objects"`
 	RootObject     string               `plist:"rootObject"`
+	//Classes map[string]interface{} `plist:"classes"`
+
+	// TODO: Add classes
 }
 
 // Generic object
@@ -24,6 +27,8 @@ type PBXObject struct {
 	ISA string `plist:"isa"`
 	PBXShellScriptBuildPhase
 	PBXContainerItemProxy
+	PBXGroup
+	PBXBuildFile
 }
 
 func (o PBXObject) ToPBXShellScriptBuildPhase(id string) PBXShellScriptBuildPhase {
@@ -47,6 +52,18 @@ type PBXContainerItemProxy struct {
 	RemoteInfo string `plist:"remoteInfo,omitempty"`
 }
 
+type PBXGroup struct {
+	ISA        string `plist:"isa"`
+	Name string `plist:"name,omitempty"`
+	SourceTree string `plist:"sourceTree,omitempty"`
+	Children []string `plist:"children,omitempty"`
+}
+
+type PBXBuildFile struct {
+	ISA        string `plist:"isa"`
+	FileRef string `plist:"fileRef,omitempty"`
+}
+
 func main() {
 	raw, err := ioutil.ReadFile("/Users/koheihisakuni/dev/embrace/go/tool/embrace/project.pbxproj")
 	if err != nil {
@@ -65,14 +82,17 @@ func main() {
 		return
 	}
 
-	_, err = plist.MarshalIndent(proj, plist.OpenStepFormat, "  ")
+	marshaled, err := plist.MarshalIndentWithMeta(proj, plist.OpenStepFormat, "  ", meta)
+	//marshaled, err := plist.MarshalIndent(proj, plist.OpenStepFormat, "  ")
 	if err != nil {
 		log.Fatal(err)
 		return
 	}
 
 	fmt.Println("NODES:")
-	showNodes(meta.Nodes, 1)
+	//showNodes(meta.Nodes, 1)
+
+	fmt.Printf("MARSHALED %v", string(marshaled))
 }
 
 func showNodes(nodes []plist.Node, level int) {

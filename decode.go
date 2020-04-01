@@ -20,14 +20,9 @@ type Decoder struct {
 	lax    bool
 }
 
-/*
-	Pass in pointer to meta struct to receive meta info
-*/
+// TODO: Add doc comments.
 func (p *Decoder) DecodeWithMeta(v interface{}, meta *Meta) (err error) {
-	// Since we're only supporting text parser, just initialize and use
-	// the text parser.
-
-	// Initialize the textParser with Meta.
+	// Since we're only supporting OpenStep format, initialize and use the textPlistParser
 	tp := newTextPlistParser(p.reader)
 	tp.meta = meta
 	pval, err := tp.parseDocument()

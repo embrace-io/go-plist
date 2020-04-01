@@ -46,6 +46,47 @@ func (p *cfDictionary) sort() {
 	sort.Sort(p)
 }
 
+func (c *cfDictionary) filterNodes(nodes []Node) (keys []string, values []cfValue, filtered []Node) {
+	m := c.toMap()
+	add := map[string]bool{}
+	for _, node := range nodes {
+		key := node.Value()
+		if _, ok := node.(*Annotation); ok {
+			keys = append(keys, key)
+			values = append(values, nil)
+			add[key] = true
+
+		}
+		if _, ok := node.(*MetaNode); ok {
+			if v, ok := m[key]; ok {
+				keys = append(keys, key)
+				values = append(values, v)
+				add[key] = true
+			}
+		}
+		if add[key] {
+			filtered = append(filtered, node)
+		}
+	}
+
+	// Make sure keys and values without corresponding node get included.
+	for k, v := range m {
+		if _, ok := add[k]; !ok {
+			keys = append(keys, k)
+			values = append(values, v)
+		}
+	}
+	return keys, values, filtered
+}
+
+func (c *cfDictionary) toMap() map[string]cfValue {
+	m := map[string]cfValue{}
+	for i, k := range c.keys {
+		m[k] = c.values[i]
+	}
+	return m
+}
+
 func (p *cfDictionary) maybeUID(lax bool) cfValue {
 	if len(p.keys) == 1 && p.keys[0] == "CF$UID" && len(p.values) == 1 {
 		pval := p.values[0]
@@ -169,4 +210,16 @@ func (cfDate) typeName() string {
 
 func (p cfDate) hash() interface{} {
 	return time.Time(p)
+}
+
+type cfAnnotation struct {
+	value string
+}
+
+func (cfAnnotation) typeName() string {
+	return "annotation"
+}
+
+func (p cfAnnotation) hash() interface{} {
+	return p.value
 }
