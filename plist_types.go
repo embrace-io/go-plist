@@ -48,22 +48,32 @@ func (p *cfDictionary) sort() {
 
 func (c *cfDictionary) filterNodes(nodes []Node) (keys []string, values []cfValue, filtered []Node) {
 	m := c.toMap()
+	add := map[string]bool{}
 	for _, node := range nodes {
-		var add bool
+		key := node.Value()
 		if _, ok := node.(*Annotation); ok {
-			keys = append(keys, node.Value())
+			keys = append(keys, key)
 			values = append(values, nil)
-			add = true
+			add[key] = true
+
 		}
 		if _, ok := node.(*MetaNode); ok {
-			if v, ok := m[node.Value()]; ok {
-				keys = append(keys, node.Value())
+			if v, ok := m[key]; ok {
+				keys = append(keys, key)
 				values = append(values, v)
-				add = true
+				add[key] = true
 			}
 		}
-		if add {
+		if add[key] {
 			filtered = append(filtered, node)
+		}
+	}
+
+	// Make sure keys and values without corresponding node get included.
+	for k, v := range m {
+		if _, ok := add[k]; !ok {
+			keys = append(keys, k)
+			values = append(values, v)
 		}
 	}
 	return keys, values, filtered
