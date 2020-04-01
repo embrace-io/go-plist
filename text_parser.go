@@ -90,6 +90,12 @@ func (p *textPlistParser) parseDocument() (pval cfValue, parseError error) {
 		node = NewMetaNode()
 	}
 
+	if comments := p.skipWhitespaceAndComments(); p.meta != nil && len(comments) > 0 {
+		for _, comment := range comments {
+			p.meta.addNode(NewAnnotation(comment))
+		}
+	}
+
 	val := p.parsePlistValue(node)
 
 	if p.meta != nil {
@@ -454,10 +460,7 @@ outer:
 			// TODO: Figure out why this was implemented.
 			continue
 		}
-		if str, ok := pval.(cfString); ok {
-			child.SetValue(string(str))
-			children = append(children, child)
-		}
+		children = append(children, child)
 		values = append(values, pval)
 	}
 

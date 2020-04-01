@@ -27,11 +27,20 @@ var (
 )
 
 func (p *textPlistGenerator) generateDocument(pval cfValue) {
-	var nodes []Node
-	if p.meta != nil && len(p.meta.Nodes) > 0 {
-		nodes = p.meta.Nodes[0].Nodes() // First is always the root of the document.
+	//if p.meta != nil && len(p.meta.Nodes) > 0 {
+	//	nodes = p.meta.Nodes[0].Nodes() // First is always the root of the document.
+	//}
+	if p.meta == nil {
+		p.writePlistValue(pval, nil)
+		return
 	}
-	p.writePlistValue(pval, nodes...)
+	for _, node := range p.meta.Nodes {
+		if annotation, ok := node.(*Annotation); ok {
+			p.writePlistValue(p.plistAnnotation(annotation.Value()))
+			continue
+		}
+		p.writePlistValue(pval, node.Nodes()...)
+	}
 }
 
 func (p *textPlistGenerator) plistQuotedString(str string, node Node) string {
@@ -160,12 +169,19 @@ func (p *textPlistGenerator) writePlistValue(pval cfValue, nodes ...Node) {
 		p.writer.Write([]byte(`(`))
 		p.deltaIndent(1)
 		for i, v := range pval.values {
-			var node Node
+			//var node Node
+			var children []Node
 			if len(nodes) > i {
-				node = nodes[i]
+				node := nodes[i]
+				if _, ok := v.(*cfDictionary); ok {
+					children = node.Nodes()
+				} else {
+					children = []Node{node}
+				}
 			}
 			p.writeIndent()
-			p.writePlistValue(v, node)
+			p.writePlistValue(v, children...)
+			//p.writePlistValue(v, nodes[i])
 			p.writer.Write(p.arrayDelimiter)
 		}
 		p.deltaIndent(-1)
